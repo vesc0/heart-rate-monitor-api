@@ -2,7 +2,7 @@ fastapi
 uvicorn[standard]
 sqlalchemy
 pydantic
-passlib[bcrypt]
+bcrypt
 python-jose[cryptography]
 psycopg2-binary
 python-dotenv

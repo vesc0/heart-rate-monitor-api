@@ -5,9 +5,9 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
+import bcrypt
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 load_dotenv()
 
@@ -26,16 +26,14 @@ try:
 except (TypeError, ValueError):
     raise RuntimeError("ACCESS_TOKEN_EXPIRE_MINUTES must be a positive integer set in the environment or .env")
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 
-def hash_password(password: str):
-    return pwd_context.hash(password)
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 
 # Create JWT token
