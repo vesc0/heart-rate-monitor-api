@@ -7,3 +7,6 @@ python-jose[cryptography]
 psycopg2-binary
 python-dotenv
 email-validator
+joblib
+numpy
+scikit-learn

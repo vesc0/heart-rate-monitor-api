@@ -97,6 +97,7 @@ class HeartRateCreate(BaseModel):
     id: Optional[str] = None  # client-generated UUID (optional)
     bpm: int = Field(..., ge=30, le=250)
     recorded_at: datetime
+    stress_level: Optional[str] = None
 
 
 class HeartRateResponse(BaseModel):
@@ -104,6 +105,7 @@ class HeartRateResponse(BaseModel):
     bpm: int
     recorded_at: datetime
     created_at: datetime
+    stress_level: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -111,3 +113,29 @@ class HeartRateResponse(BaseModel):
 
 class HeartRateBulkDelete(BaseModel):
     ids: list[str] = Field(..., min_length=1, max_length=500)
+
+
+# ── Stress prediction ────────────────────────────────
+
+
+class StressPredictRequest(BaseModel):
+    """HRV features computed from a 60-second PPG capture window."""
+    mean_rr: float = Field(..., description="Mean RR interval (ms)")
+    sdnn: float = Field(..., description="Std dev of RR intervals (ms)")
+    median_rr: float = Field(..., description="Median RR interval (ms)")
+    cv_rr: float = Field(..., description="Coefficient of variation of RR")
+    rmssd: float = Field(..., description="Root mean square of successive differences (ms)")
+    sdsd: float = Field(..., description="Std dev of successive differences (ms)")
+    pnn50: float = Field(..., description="% of successive diffs > 50ms")
+    pnn20: float = Field(..., description="% of successive diffs > 20ms")
+    mean_hr: float = Field(..., description="Mean heart rate (BPM)")
+    std_hr: float = Field(..., description="Std dev of heart rate (BPM)")
+    min_hr: float = Field(..., description="Minimum heart rate (BPM)")
+    max_hr: float = Field(..., description="Maximum heart rate (BPM)")
+    hr_range: float = Field(..., description="Heart rate range (BPM)")
+    num_beats: float = Field(..., description="Number of beats in window")
+
+
+class StressPredictResponse(BaseModel):
+    is_stressed: bool
+    stress_level: str

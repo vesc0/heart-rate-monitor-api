@@ -1,6 +1,8 @@
 import logging
 import uuid
 
+import joblib
+import numpy as np
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +16,8 @@ from schemas import (
     HeartRateBulkDelete,
     HeartRateCreate,
     HeartRateResponse,
+    StressPredictRequest,
+    StressPredictResponse,
     UserLogin,
     UserProfile,
     UserProfileUpdate,
@@ -26,13 +30,36 @@ from utils import (
     verify_password,
 )
 from datetime import timezone
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 # ── Bootstrap ─────────────────────────────────────────
 Base.metadata.create_all(bind=engine)
 
+# Add stress_level column if missing (lightweight schema migration)
+try:
+    with engine.connect() as conn:
+        from sqlalchemy import text, inspect as sa_inspect
+        inspector = sa_inspect(engine)
+        columns = [c["name"] for c in inspector.get_columns("heart_rate_records")]
+        if "stress_level" not in columns:
+            conn.execute(text("ALTER TABLE heart_rate_records ADD COLUMN stress_level VARCHAR"))
+            conn.commit()
+            logger.info("Added stress_level column to heart_rate_records")
+except Exception as e:
+    logger.warning("Schema migration check failed (non-fatal): %s", e)
+
 app = FastAPI(title="Heart Rate Monitor API")
+
+# ── Load ML models at startup ─────────────────────────
+_ML_DIR = Path(__file__).parent / "ml_models"
+_ml_artifacts = None
+try:
+    _ml_artifacts = joblib.load(_ML_DIR / "all_artifacts.joblib")
+    logger.info("ML models loaded from %s", _ML_DIR)
+except Exception as e:
+    logger.warning("ML models not found at %s — /stress-predict will be unavailable: %s", _ML_DIR, e)
 
 app.add_middleware(
     CORSMiddleware,
@@ -213,6 +240,7 @@ def create_heart_rate(
         user_id=user_id,
         bpm=entry.bpm,
         recorded_at=rec_dt,
+        stress_level=entry.stress_level,
     )
     db.add(record)
     try:
@@ -287,3 +315,50 @@ def batch_delete_heart_rate(
     )
     db.commit()
     return {"deleted": deleted}
+
+
+# ── Stress prediction ────────────────────────────────
+
+
+@app.post("/stress-predict", response_model=StressPredictResponse)
+def predict_stress(
+    body: StressPredictRequest,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Run the trained binary stress model on HRV features from a
+    60-second PPG capture window.  Returns stressed / not-stressed."""
+    if _ml_artifacts is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Stress prediction unavailable.",
+        )
+
+    feature_cols = _ml_artifacts["feature_columns"]
+    bin_model = _ml_artifacts["binary_model"]
+
+    # Build feature vector in the exact order the model expects
+    features = {
+        "mean_rr": body.mean_rr,
+        "sdnn": body.sdnn,
+        "median_rr": body.median_rr,
+        "cv_rr": body.cv_rr,
+        "rmssd": body.rmssd,
+        "sdsd": body.sdsd,
+        "pnn50": body.pnn50,
+        "pnn20": body.pnn20,
+        "mean_hr": body.mean_hr,
+        "std_hr": body.std_hr,
+        "min_hr": body.min_hr,
+        "max_hr": body.max_hr,
+        "hr_range": body.hr_range,
+        "num_beats": body.num_beats,
+    }
+    X = np.array([[features[c] for c in feature_cols]])
+
+    bin_pred = int(bin_model.predict(X)[0])
+    is_stressed = bool(bin_pred)
+
+    return StressPredictResponse(
+        is_stressed=is_stressed,
+        stress_level="Stressed" if is_stressed else "Not Stressed",
+    )
