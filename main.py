@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 # ── Bootstrap ─────────────────────────────────────────
 Base.metadata.create_all(bind=engine)
 
-# Add stress_level column if missing (lightweight schema migration)
+# Add missing columns (lightweight schema migration)
 try:
     with engine.connect() as conn:
         from sqlalchemy import text, inspect as sa_inspect
@@ -47,6 +47,12 @@ try:
             conn.execute(text("ALTER TABLE heart_rate_records ADD COLUMN stress_level VARCHAR"))
             conn.commit()
             logger.info("Added stress_level column to heart_rate_records")
+        user_columns = [c["name"] for c in inspector.get_columns("users")]
+        for col_name, col_type in [("gender", "VARCHAR"), ("height_cm", "INTEGER"), ("weight_kg", "INTEGER")]:
+            if col_name not in user_columns:
+                conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}"))
+                conn.commit()
+                logger.info("Added %s column to users", col_name)
 except Exception as e:
     logger.warning("Schema migration check failed (non-fatal): %s", e)
 
@@ -157,6 +163,9 @@ def login(body: UserLogin, db: Session = Depends(get_db)):
         "username": user.username,
         "email": user.email,
         "age": user.age,
+        "gender": user.gender,
+        "height_cm": user.height_cm,
+        "weight_kg": user.weight_kg,
         "health_issues": user.health_issues,
     }
 
@@ -194,6 +203,12 @@ def update_profile(
         user.email = body.email
     if body.age is not None:
         user.age = body.age
+    if body.gender is not None:
+        user.gender = body.gender
+    if body.height_cm is not None:
+        user.height_cm = body.height_cm
+    if body.weight_kg is not None:
+        user.weight_kg = body.weight_kg
     if body.health_issues is not None:
         user.health_issues = body.health_issues
     try:
@@ -324,9 +339,10 @@ def batch_delete_heart_rate(
 def predict_stress(
     body: StressPredictRequest,
     user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
 ):
-    """Run the trained binary stress model on HRV features from a
-    60-second PPG capture window.  Returns stressed / not-stressed."""
+    """Run the trained stress model on HRV features (+ optional demographics)
+    from a 60-second PPG capture window.  Returns stress_level_pct 0–100."""
     if _ml_artifacts is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -334,31 +350,52 @@ def predict_stress(
         )
 
     feature_cols = _ml_artifacts["feature_columns"]
-    bin_model = _ml_artifacts["binary_model"]
+    model = _ml_artifacts["model"]
+    demo_defaults = _ml_artifacts.get("demo_defaults", {})
 
-    # Build feature vector in the exact order the model expects
-    features = {
-        "mean_rr": body.mean_rr,
-        "sdnn": body.sdnn,
-        "median_rr": body.median_rr,
-        "cv_rr": body.cv_rr,
-        "rmssd": body.rmssd,
-        "sdsd": body.sdsd,
-        "pnn50": body.pnn50,
-        "pnn20": body.pnn20,
-        "mean_hr": body.mean_hr,
-        "std_hr": body.std_hr,
-        "min_hr": body.min_hr,
-        "max_hr": body.max_hr,
+    # Build feature vector: start with demographic defaults, override with request
+    features = dict(demo_defaults)
+
+    # Map all HRV fields from the request body
+    hrv_map = {
+        "sdnn": body.sdnn, "median_rr": body.median_rr,
+        "cv_rr": body.cv_rr, "rmssd": body.rmssd,
+        "pnn50": body.pnn50, "pnn20": body.pnn20, "mean_hr": body.mean_hr,
+        "std_hr": body.std_hr, "min_hr": body.min_hr, "max_hr": body.max_hr,
         "hr_range": body.hr_range,
-        "num_beats": body.num_beats,
+        "lf_power": body.lf_power, "hf_power": body.hf_power,
+        "lf_hf_ratio": body.lf_hf_ratio, "total_power": body.total_power,
+        "lf_norm": body.lf_norm,
+        "sd1": body.sd1, "sd2": body.sd2, "sd_ratio": body.sd_ratio,
     }
-    X = np.array([[features[c] for c in feature_cols]])
+    features.update(hrv_map)
 
-    bin_pred = int(bin_model.predict(X)[0])
-    is_stressed = bool(bin_pred)
+    # Override demographics from request if provided
+    for demo_key, body_val in [
+        ("age", body.age), ("gender_male", body.gender_male),
+        ("height_cm", body.height_cm), ("weight_kg", body.weight_kg),
+    ]:
+        if body_val is not None:
+            features[demo_key] = float(body_val)
+
+    # Fallback: fill remaining defaults from user profile demographics
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        if body.age is None and user.age:
+            features["age"] = float(user.age)
+        if body.gender_male is None and user.gender:
+            features["gender_male"] = 1.0 if user.gender == "male" else 0.0
+        if body.height_cm is None and user.height_cm:
+            features["height_cm"] = float(user.height_cm)
+        if body.weight_kg is None and user.weight_kg:
+            features["weight_kg"] = float(user.weight_kg)
+
+    X = np.array([[features.get(c, 0.0) for c in feature_cols]])
+
+    proba = model.predict_proba(X)[0]
+    stress_pct = round(float(proba[1]) * 100, 1)
 
     return StressPredictResponse(
-        is_stressed=is_stressed,
-        stress_level="Stressed" if is_stressed else "Not Stressed",
+        stress_level_pct=stress_pct,
+        is_stressed=stress_pct >= 50,
     )

@@ -68,6 +68,9 @@ class UserProfile(BaseModel):
     username: str
     email: str
     age: Optional[int] = None
+    gender: Optional[str] = None
+    height_cm: Optional[int] = None
+    weight_kg: Optional[int] = None
     health_issues: Optional[str] = None
 
     class Config:
@@ -78,6 +81,9 @@ class UserProfileUpdate(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=30)
     email: Optional[EmailStr] = None
     age: Optional[int] = Field(None, ge=1, le=150)
+    gender: Optional[str] = Field(None, pattern=r'^(male|female)$')
+    height_cm: Optional[int] = Field(None, ge=50, le=300)
+    weight_kg: Optional[int] = Field(None, ge=20, le=500)
     health_issues: Optional[str] = Field(None, max_length=500)
 
     @field_validator("username")
@@ -117,15 +123,14 @@ class HeartRateBulkDelete(BaseModel):
 
 # ── Stress prediction ────────────────────────────────
 
-
+# HRV features computed from a 60-second PPG capture window,
+# plus optional demographics for improved prediction.
 class StressPredictRequest(BaseModel):
-    """HRV features computed from a 60-second PPG capture window."""
-    mean_rr: float = Field(..., description="Mean RR interval (ms)")
+    # HRV features (required)
     sdnn: float = Field(..., description="Std dev of RR intervals (ms)")
     median_rr: float = Field(..., description="Median RR interval (ms)")
     cv_rr: float = Field(..., description="Coefficient of variation of RR")
     rmssd: float = Field(..., description="Root mean square of successive differences (ms)")
-    sdsd: float = Field(..., description="Std dev of successive differences (ms)")
     pnn50: float = Field(..., description="% of successive diffs > 50ms")
     pnn20: float = Field(..., description="% of successive diffs > 20ms")
     mean_hr: float = Field(..., description="Mean heart rate (BPM)")
@@ -133,9 +138,23 @@ class StressPredictRequest(BaseModel):
     min_hr: float = Field(..., description="Minimum heart rate (BPM)")
     max_hr: float = Field(..., description="Maximum heart rate (BPM)")
     hr_range: float = Field(..., description="Heart rate range (BPM)")
-    num_beats: float = Field(..., description="Number of beats in window")
+    # Frequency-domain HRV
+    lf_power: float = Field(0, description="Low-frequency power")
+    hf_power: float = Field(0, description="High-frequency power")
+    lf_hf_ratio: float = Field(0, description="LF/HF ratio")
+    total_power: float = Field(0, description="Total spectral power")
+    lf_norm: float = Field(0, description="Normalized LF power (%)")
+    # Nonlinear HRV
+    sd1: float = Field(0, description="Poincaré SD1")
+    sd2: float = Field(0, description="Poincaré SD2")
+    sd_ratio: float = Field(0, description="SD2/SD1 ratio")
+    # Demographics (optional — medians used when missing)
+    age: Optional[float] = Field(None, description="Age in years")
+    gender_male: Optional[float] = Field(None, description="1=male, 0=female")
+    height_cm: Optional[float] = Field(None, description="Height in cm")
+    weight_kg: Optional[float] = Field(None, description="Weight in kg")
 
 
 class StressPredictResponse(BaseModel):
+    stress_level_pct: float
     is_stressed: bool
-    stress_level: str

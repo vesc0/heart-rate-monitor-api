@@ -15,6 +15,9 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     age = Column(Integer, nullable=True)
+    gender = Column(String, nullable=True)
+    height_cm = Column(Integer, nullable=True)
+    weight_kg = Column(Integer, nullable=True)
     health_issues = Column(String, nullable=True)
 
     heart_rate_records = relationship(
