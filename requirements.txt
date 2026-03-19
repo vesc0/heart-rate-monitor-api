@@ -10,3 +10,4 @@ email-validator
 joblib
 numpy
 scikit-learn
+openai

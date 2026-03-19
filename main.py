@@ -29,7 +29,9 @@ from utils import (
     hash_password,
     verify_password,
 )
+from utils import call_openai_for_stress
 from datetime import timezone
+import os
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -398,4 +400,62 @@ def predict_stress(
     return StressPredictResponse(
         stress_level_pct=stress_pct,
         is_stressed=stress_pct >= 50,
+    )
+
+
+@app.post("/stress-predict-llm", response_model=StressPredictResponse)
+def predict_stress_llm(
+    body: StressPredictRequest,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Send features to an LLM (OpenAI) and return the strict JSON prediction."""
+    # Build feature dict (reuse demo defaults if available)
+    demo_defaults = _ml_artifacts.get("demo_defaults", {}) if _ml_artifacts else {}
+    features = dict(demo_defaults)
+
+    hrv_map = {
+        "sdnn": body.sdnn, "median_rr": body.median_rr,
+        "cv_rr": body.cv_rr, "rmssd": body.rmssd,
+        "pnn50": body.pnn50, "pnn20": body.pnn20, "mean_hr": body.mean_hr,
+        "std_hr": body.std_hr, "min_hr": body.min_hr, "max_hr": body.max_hr,
+        "hr_range": body.hr_range,
+        "lf_power": body.lf_power, "hf_power": body.hf_power,
+        "lf_hf_ratio": body.lf_hf_ratio, "total_power": body.total_power,
+        "lf_norm": body.lf_norm,
+        "sd1": body.sd1, "sd2": body.sd2, "sd_ratio": body.sd_ratio,
+    }
+    features.update(hrv_map)
+
+    for demo_key, body_val in [
+        ("age", body.age), ("gender_male", body.gender_male),
+        ("height_cm", body.height_cm), ("weight_kg", body.weight_kg),
+    ]:
+        if body_val is not None:
+            features[demo_key] = float(body_val)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        if body.age is None and user.age:
+            features["age"] = float(user.age)
+        if body.gender_male is None and user.gender:
+            features["gender_male"] = 1.0 if user.gender == "male" else 0.0
+        if body.height_cm is None and user.height_cm:
+            features["height_cm"] = float(user.height_cm)
+        if body.weight_kg is None and user.weight_kg:
+            features["weight_kg"] = float(user.weight_kg)
+
+    # Ensure OpenAI key present
+    if not os.getenv("OPENAI_API_KEY"):
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="OpenAI API key not configured")
+
+    try:
+        llm_resp = call_openai_for_stress(features)
+    except Exception as e:
+        logger.exception("LLM stress prediction failed: %s", e)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="LLM stress prediction failed")
+
+    return StressPredictResponse(
+        stress_level_pct=llm_resp["stress_level_pct"],
+        is_stressed=llm_resp["is_stressed"],
     )
