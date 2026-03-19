@@ -265,13 +265,18 @@ def create_heart_rate(
         db.refresh(record)
     except IntegrityError:
         db.rollback()
-        # Duplicate id → likely a client retry; return the existing record
+        # Duplicate id -> treat as upsert and update the existing user-owned record.
         existing = (
             db.query(HeartRateRecord)
             .filter(HeartRateRecord.id == record.id, HeartRateRecord.user_id == user_id)
             .first()
         )
         if existing:
+            existing.bpm = entry.bpm
+            existing.recorded_at = rec_dt
+            existing.stress_level = entry.stress_level
+            db.commit()
+            db.refresh(existing)
             return existing
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Duplicate entry"
