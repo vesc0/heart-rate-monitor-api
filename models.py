@@ -11,7 +11,9 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
+    # Legacy field kept for backward compatibility with existing databases.
+    username = Column(String, unique=True, index=True, nullable=True)
+    name = Column(String, nullable=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     age = Column(Integer, nullable=True)
@@ -36,5 +38,6 @@ class HeartRateRecord(Base):
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )
     stress_level = Column(String, nullable=True)
+    activity_state = Column(String, nullable=True)
 
     user = relationship("User", back_populates="heart_rate_records")

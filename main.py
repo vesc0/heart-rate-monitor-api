@@ -49,12 +49,25 @@ try:
             conn.execute(text("ALTER TABLE heart_rate_records ADD COLUMN stress_level VARCHAR"))
             conn.commit()
             logger.info("Added stress_level column to heart_rate_records")
+        if "activity_state" not in columns:
+            conn.execute(text("ALTER TABLE heart_rate_records ADD COLUMN activity_state VARCHAR"))
+            conn.commit()
+            logger.info("Added activity_state column to heart_rate_records")
         user_columns = [c["name"] for c in inspector.get_columns("users")]
         for col_name, col_type in [("gender", "VARCHAR"), ("height_cm", "INTEGER"), ("weight_kg", "INTEGER")]:
             if col_name not in user_columns:
                 conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}"))
                 conn.commit()
                 logger.info("Added %s column to users", col_name)
+        has_name = "name" in user_columns
+        if not has_name:
+            conn.execute(text("ALTER TABLE users ADD COLUMN name VARCHAR"))
+            conn.commit()
+            logger.info("Added name column to users")
+            has_name = True
+        if has_name and "username" in user_columns:
+            conn.execute(text("UPDATE users SET name = username WHERE name IS NULL AND username IS NOT NULL"))
+            conn.commit()
 except Exception as e:
     logger.warning("Schema migration check failed (non-fatal): %s", e)
 
@@ -124,9 +137,7 @@ def get_db():
 
 @app.post("/register", status_code=status.HTTP_201_CREATED)
 def register(body: UserRegister, db: Session = Depends(get_db)):
-    username = body.username or body.email.split("@")[0]
     user = User(
-        username=username,
         email=body.email,
         hashed_password=hash_password(body.password),
     )
@@ -138,12 +149,13 @@ def register(body: UserRegister, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Email or username already registered",
+            detail="Email already registered",
         )
     token = create_access_token(data={"sub": user.id})
     return {
         "message": "User registered",
-        "username": user.username,
+        "email": user.email,
+        "name": user.name,
         "access_token": token,
         "token_type": "bearer",
     }
@@ -162,7 +174,7 @@ def login(body: UserLogin, db: Session = Depends(get_db)):
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "username": user.username,
+        "name": user.name,
         "email": user.email,
         "age": user.age,
         "gender": user.gender,
@@ -199,8 +211,8 @@ def update_profile(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
-    if body.username is not None:
-        user.username = body.username
+    if body.name is not None:
+        user.name = body.name
     if body.email is not None:
         user.email = body.email
     if body.age is not None:
@@ -220,7 +232,7 @@ def update_profile(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email or username already taken",
+            detail="Email already taken",
         )
     return user
 
@@ -258,6 +270,7 @@ def create_heart_rate(
         bpm=entry.bpm,
         recorded_at=rec_dt,
         stress_level=entry.stress_level,
+        activity_state=entry.activity_state,
     )
     db.add(record)
     try:
@@ -275,6 +288,7 @@ def create_heart_rate(
             existing.bpm = entry.bpm
             existing.recorded_at = rec_dt
             existing.stress_level = entry.stress_level
+            existing.activity_state = entry.activity_state
             db.commit()
             db.refresh(existing)
             return existing

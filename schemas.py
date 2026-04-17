@@ -1,15 +1,16 @@
 import re
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 # ── Validators ────────────────────────────────────────
 
-_USERNAME_RE = re.compile(r"^[a-zA-Z0-9_-]{3,30}$")
 _PASSWORD_MIN = 8
 _PASSWORD_MAX = 72
+
+ActivityState = Literal["resting", "activity", "recovery"]
 
 
 def _validate_password(v: str) -> str:
@@ -32,21 +33,11 @@ def _validate_password(v: str) -> str:
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=_PASSWORD_MIN, max_length=_PASSWORD_MAX)
-    username: Optional[str] = None  # auto-derived from email if omitted
 
     @field_validator("password")
     @classmethod
     def password_strength(cls, v: str) -> str:
         return _validate_password(v)
-
-    @field_validator("username")
-    @classmethod
-    def username_format(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and not _USERNAME_RE.match(v):
-            raise ValueError(
-                "Username must be 3-30 characters and contain only letters, digits, hyphens, or underscores"
-            )
-        return v
 
 
 class UserLogin(BaseModel):
@@ -61,12 +52,13 @@ class TokenResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
-    username: str
+    email: EmailStr
+    name: Optional[str] = None
 
 
 class UserProfile(BaseModel):
-    username: str
-    email: str
+    name: Optional[str] = None
+    email: EmailStr
     age: Optional[int] = None
     gender: Optional[str] = None
     height_cm: Optional[int] = None
@@ -78,22 +70,13 @@ class UserProfile(BaseModel):
 
 
 class UserProfileUpdate(BaseModel):
-    username: Optional[str] = Field(None, min_length=3, max_length=30)
+    name: Optional[str] = Field(None, min_length=1, max_length=120)
     email: Optional[EmailStr] = None
     age: Optional[int] = Field(None, ge=1, le=150)
-    gender: Optional[str] = Field(None, pattern=r'^(male|female)$')
+    gender: Optional[str] = Field(None, pattern=r'^(male|female|other)$')
     height_cm: Optional[int] = Field(None, ge=50, le=300)
     weight_kg: Optional[int] = Field(None, ge=20, le=500)
     health_issues: Optional[str] = Field(None, max_length=500)
-
-    @field_validator("username")
-    @classmethod
-    def username_format(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and not _USERNAME_RE.match(v):
-            raise ValueError(
-                "Username must be 3-30 characters and contain only letters, digits, hyphens, or underscores"
-            )
-        return v
 
 
 # ── Heart-rate entries ────────────────────────────────
@@ -104,6 +87,7 @@ class HeartRateCreate(BaseModel):
     bpm: int = Field(..., ge=30, le=250)
     recorded_at: datetime
     stress_level: Optional[str] = None
+    activity_state: Optional[ActivityState] = None
 
 
 class HeartRateResponse(BaseModel):
@@ -112,6 +96,7 @@ class HeartRateResponse(BaseModel):
     recorded_at: datetime
     created_at: datetime
     stress_level: Optional[str] = None
+    activity_state: Optional[ActivityState] = None
 
     class Config:
         from_attributes = True
