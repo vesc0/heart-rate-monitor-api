@@ -10,4 +10,7 @@ email-validator
 joblib
 numpy
 scikit-learn
+shap
+qdrant-client
+sentence-transformers
 openai

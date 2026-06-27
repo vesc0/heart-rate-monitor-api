@@ -1,0 +1,65 @@
+[
+  {
+    "id": "hrv-overview",
+    "title": "Heart rate variability overview",
+    "source": "Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology, 1996",
+    "tags": ["hrv", "autonomic nervous system", "stress"],
+    "text": "Heart rate variability describes beat-to-beat variation in cardiac intervals. It is commonly used as a noninvasive marker related to autonomic nervous system regulation. HRV patterns can be influenced by stress, sleep, illness, hydration, medication, posture, breathing, physical activity, and measurement quality. HRV should be interpreted as contextual physiological information, not as a standalone diagnosis."
+  },
+  {
+    "id": "sdnn-interpretation",
+    "title": "SDNN and overall variability",
+    "source": "Shaffer and Ginsberg, Frontiers in Public Health, 2017",
+    "tags": ["sdnn", "variability", "recovery"],
+    "text": "SDNN is the standard deviation of normal-to-normal intervals and reflects overall HRV during the measurement window. Lower SDNN during a comparable resting measurement can be consistent with reduced variability or increased physiological load, while higher SDNN often reflects greater beat-to-beat flexibility. Short camera-based measurements should be interpreted cautiously because artifacts and breathing patterns can affect SDNN."
+  },
+  {
+    "id": "rmssd-parasympathetic",
+    "title": "RMSSD and parasympathetic activity",
+    "source": "Shaffer and Ginsberg, Frontiers in Public Health, 2017",
+    "tags": ["rmssd", "parasympathetic", "vagal tone"],
+    "text": "RMSSD measures short-term differences between successive cardiac intervals and is commonly associated with parasympathetic, or vagal, modulation. Lower RMSSD in a resting context can occur with stress, fatigue, poor recovery, illness, alcohol, or sleep disruption. A single RMSSD value should be compared with personal baseline and measurement conditions rather than treated as a universal threshold."
+  },
+  {
+    "id": "pnn50-pnn20",
+    "title": "pNN50 and pNN20 short-term variability",
+    "source": "HRV methods literature summary",
+    "tags": ["pnn50", "pnn20", "short-term hrv"],
+    "text": "pNN50 and pNN20 describe the percentage of adjacent interval differences greater than 50 ms or 20 ms. These features represent short-term variability and can move with RMSSD. Lower values can indicate reduced beat-to-beat variability in the measured window, but they are sensitive to signal quality and the number of valid beats available."
+  },
+  {
+    "id": "heart-rate-and-stress",
+    "title": "Heart rate patterns and acute stress",
+    "source": "Autonomic physiology reference summary",
+    "tags": ["heart rate", "sympathetic", "stress"],
+    "text": "Acute stress can increase sympathetic activation and may raise heart rate while reducing some HRV measures. However, heart rate alone is not specific to stress. Exercise, caffeine, fever, dehydration, pain, posture, and anxiety can also increase heart rate. A model explanation should connect heart-rate features with HRV features instead of relying on heart rate alone."
+  },
+  {
+    "id": "lf-hf-ratio",
+    "title": "LF, HF, and LF/HF ratio caution",
+    "source": "HRV frequency-domain interpretation summary",
+    "tags": ["lf power", "hf power", "lf hf ratio", "frequency domain"],
+    "text": "Frequency-domain HRV features such as LF power, HF power, and LF/HF ratio are sometimes used to discuss autonomic balance, but interpretation is debated and depends on breathing, posture, recording length, and preprocessing. LF/HF ratio should not be described as a direct stress meter. It can be used as one contextual feature among time-domain and nonlinear HRV measures."
+  },
+  {
+    "id": "poincare-sd1-sd2",
+    "title": "Poincare SD1 and SD2",
+    "source": "Nonlinear HRV methods summary",
+    "tags": ["sd1", "sd2", "nonlinear hrv", "poincare"],
+    "text": "Poincare plot features describe short-term and longer-term variability in cardiac intervals. SD1 is closely related to short-term variability and often tracks RMSSD. SD2 reflects broader interval dispersion. Changes in SD1, SD2, or their ratio can support an HRV interpretation, but they should be considered together with signal quality and context."
+  },
+  {
+    "id": "camera-ppg-limitations",
+    "title": "Camera PPG measurement limitations",
+    "source": "Mobile photoplethysmography measurement summary",
+    "tags": ["ppg", "camera", "measurement quality", "artifacts"],
+    "text": "Camera-based photoplethysmography estimates pulse timing from optical changes in the finger or skin. Motion, pressure, lighting, low perfusion, arrhythmias, and dropped frames can affect interval estimates and HRV features. Explanations should mention that PPG-based HRV is an indirect estimate and is best interpreted across repeated, good-quality measurements."
+  },
+  {
+    "id": "wellness-guidance-boundaries",
+    "title": "Boundaries for wellness explanations",
+    "source": "Patient-facing digital health communication summary",
+    "tags": ["wellness", "medical advice", "safety"],
+    "text": "A stress monitoring app can explain physiological patterns and suggest low-risk wellness steps such as rest, breathing, hydration, sleep, or repeating a measurement under consistent conditions. It should not diagnose medical conditions or present HRV as a definitive health assessment. Users with chest pain, fainting, severe shortness of breath, or persistent concerning symptoms should seek professional medical care."
+  }
+]

@@ -6,7 +6,6 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 # ── Validators ────────────────────────────────────────
-
 _PASSWORD_MIN = 8
 _PASSWORD_MAX = 72
 
@@ -28,8 +27,6 @@ def _validate_password(v: str) -> str:
 
 
 # ── Auth ──────────────────────────────────────────────
-
-
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=_PASSWORD_MIN, max_length=_PASSWORD_MAX)
@@ -80,8 +77,6 @@ class UserProfileUpdate(BaseModel):
 
 
 # ── Heart-rate entries ────────────────────────────────
-
-
 class HeartRateCreate(BaseModel):
     id: Optional[str] = None  # client-generated UUID (optional)
     bpm: int = Field(..., ge=30, le=250)
@@ -107,9 +102,7 @@ class HeartRateBulkDelete(BaseModel):
 
 
 # ── Stress prediction ────────────────────────────────
-
-# HRV features computed from a 60-second PPG capture window,
-# plus optional demographics for improved prediction.
+# HRV features computed from a 60-second PPG capture window, plus optional demographics for improved prediction.
 class StressPredictRequest(BaseModel):
     # HRV features (required)
     sdnn: float = Field(..., description="Std dev of RR intervals (ms)")
@@ -143,3 +136,42 @@ class StressPredictRequest(BaseModel):
 class StressPredictResponse(BaseModel):
     stress_level_pct: float
     is_stressed: bool
+
+
+ShapDirection = Literal["increases_stress", "decreases_stress", "neutral"]
+
+
+class ShapFeatureContribution(BaseModel):
+    feature: str = Field(..., description="Model feature name")
+    display_name: str = Field(..., description="Human-readable feature name")
+    value: float = Field(..., description="Input value used by the model")
+    shap_value: float = Field(..., description="SHAP contribution on probability scale")
+    contribution_pct: float = Field(..., description="SHAP contribution in percentage points")
+    direction: ShapDirection
+
+
+class ShapExplanation(BaseModel):
+    model_output: Literal["stress_probability"]
+    base_value: float = Field(..., description="Baseline stress probability")
+    base_value_pct: float = Field(..., description="Baseline stress probability percentage")
+    prediction_value: float = Field(..., description="Predicted stress probability")
+    prediction_pct: float = Field(..., description="Predicted stress percentage")
+    top_contributions: list[ShapFeatureContribution]
+
+
+class StressExplainResponse(StressPredictResponse):
+    explanation: ShapExplanation
+
+
+class RetrievedContextItem(BaseModel):
+    id: str
+    title: str
+    source: str
+    text: str
+    score: float
+
+
+class StressAnalysisResponse(StressPredictResponse):
+    important_features: list[ShapFeatureContribution]
+    retrieved_context: list[RetrievedContextItem]
+    explanation: str
