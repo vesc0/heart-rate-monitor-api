@@ -1,0 +1,36 @@
+# Core API
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+email-validator
+
+# Database
+sqlalchemy
+psycopg2-binary
+alembic
+
+# Security / Auth
+bcrypt
+python-jose[cryptography]
+
+# Machine Learning Integration
+joblib
+numpy
+scikit-learn
+shap
+
+# Vector DB / LLM (from current requirements)
+qdrant-client
+sentence-transformers
+openai
+
+# Utils / Tooling
+python-dotenv
+structlog
+pip-tools
+
+# Testing
+pytest
+pytest-asyncio
+httpx

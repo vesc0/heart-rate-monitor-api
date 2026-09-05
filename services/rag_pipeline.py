@@ -1,6 +1,5 @@
 import hashlib
 import json
-import logging
 import os
 import uuid
 from dataclasses import dataclass
@@ -10,7 +9,8 @@ from typing import Any, Optional
 import numpy as np
 from sklearn.feature_extraction.text import HashingVectorizer
 
-logger = logging.getLogger(__name__)
+from core.logger import get_logger
+logger = get_logger(__name__)
 
 
 class RagPipelineUnavailableError(RuntimeError):

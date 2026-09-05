@@ -1,4 +1,3 @@
-import logging
 import os
 import threading
 from dataclasses import dataclass
@@ -8,7 +7,8 @@ from typing import Any, Optional
 import joblib
 import numpy as np
 
-logger = logging.getLogger(__name__)
+from core.logger import get_logger
+logger = get_logger(__name__)
 
 DEMOGRAPHIC_FEATURE_FIELDS = ("age", "gender_male", "height_cm", "weight_kg")
 HRV_FEATURE_FIELDS = (
@@ -257,17 +257,13 @@ class StressModelService:
 
         with self._shap_lock:
             if self._explainer is None:
-                background = self._build_shap_background()
-                self._explainer = shap.KernelExplainer(
-                    self._predict_proba_for_shap,
-                    background,
-                    link="identity",
-                )
+                clf = getattr(self._model, "named_steps", {}).get("clf", self._model)
+                self._explainer = shap.TreeExplainer(clf)
 
-            shap_values = self._explainer.shap_values(
-                feature_matrix,
-                nsamples=self._shap_nsamples,
-            )
+            scaler = getattr(self._model, "named_steps", {}).get("scaler")
+            scaled_features = scaler.transform(feature_matrix) if scaler else feature_matrix
+
+            shap_values = self._explainer.shap_values(scaled_features)
             return shap_values, self._explainer.expected_value
 
     def _build_shap_background(self) -> np.ndarray:

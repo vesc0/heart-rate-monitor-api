@@ -1,50 +1,24 @@
-import logging
+import os
+
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import OperationalError
 
-from db.database import engine, Base
+from db.migrations import run_migrations
 from api.routes import auth, profile, heart_rate, stress
 
+from core.logger import setup_logging, get_logger
+
 # Configure logging
-logger = logging.getLogger(__name__)
+setup_logging()
+logger = get_logger(__name__)
 
-# Bootstrap Database
-Base.metadata.create_all(bind=engine)
-
-# Add missing columns (lightweight schema migration)
-try:
-    with engine.connect() as conn:
-        from sqlalchemy import text, inspect as sa_inspect
-        inspector = sa_inspect(engine)
-        columns = [c["name"] for c in inspector.get_columns("heart_rate_records")]
-        if "stress_level" not in columns:
-            conn.execute(text("ALTER TABLE heart_rate_records ADD COLUMN stress_level VARCHAR"))
-            conn.commit()
-            logger.info("Added stress_level column to heart_rate_records")
-        if "activity_state" not in columns:
-            conn.execute(text("ALTER TABLE heart_rate_records ADD COLUMN activity_state VARCHAR"))
-            conn.commit()
-            logger.info("Added activity_state column to heart_rate_records")
-        user_columns = [c["name"] for c in inspector.get_columns("users")]
-        for col_name, col_type in [("gender", "VARCHAR"), ("height_cm", "INTEGER"), ("weight_kg", "INTEGER")]:
-            if col_name not in user_columns:
-                conn.execute(text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}"))
-                conn.commit()
-                logger.info("Added %s column to users", col_name)
-        has_name = "name" in user_columns
-        if not has_name:
-            conn.execute(text("ALTER TABLE users ADD COLUMN name VARCHAR"))
-            conn.commit()
-            logger.info("Added name column to users")
-            has_name = True
-        if has_name and "username" in user_columns:
-            conn.execute(text("UPDATE users SET name = username WHERE name IS NULL AND username IS NOT NULL"))
-            conn.commit()
-except Exception as e:
-    logger.warning("Schema migration check failed (non-fatal): %s", e)
+# Bring the schema up to date (Alembic; safe to run on every start).
+# Tests set RUN_MIGRATIONS=0 so importing the app never touches a real database.
+if os.getenv("RUN_MIGRATIONS", "1") != "0":
+    run_migrations()
 
 # FastAPI application instance
 app = FastAPI(title="Heart Rate Monitor API")
