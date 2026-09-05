@@ -1,4 +1,3 @@
-import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -104,7 +103,6 @@ class StressModelService:
         self._feature_columns = list(DEFAULT_FEATURE_COLUMNS)
         self._explainer: Any = None
         self._shap_lock = threading.Lock()
-        self._shap_nsamples = self._read_positive_int("SHAP_NSAMPLES", 100)
         self.load()
 
     @property
@@ -241,12 +239,6 @@ class StressModelService:
         probabilities = self._model.predict_proba(self._feature_matrix(features))[0]
         return float(probabilities[1])
 
-    def _predict_proba_for_shap(self, feature_matrix: np.ndarray) -> np.ndarray:
-        feature_matrix = np.asarray(feature_matrix, dtype=float)
-        if feature_matrix.ndim == 1:
-            feature_matrix = feature_matrix.reshape(1, -1)
-        return self._model.predict_proba(feature_matrix)
-
     def _compute_shap_values(self, feature_matrix: np.ndarray) -> tuple[Any, Any]:
         try:
             import shap
@@ -258,66 +250,28 @@ class StressModelService:
         with self._shap_lock:
             if self._explainer is None:
                 clf = getattr(self._model, "named_steps", {}).get("clf", self._model)
-                self._explainer = shap.TreeExplainer(clf)
+                try:
+                    self._explainer = shap.TreeExplainer(clf)
+                except Exception as exc:
+                    logger.warning(
+                        "SHAP explainer unavailable for %s: %s", type(clf).__name__, exc
+                    )
+                    raise StressExplanationUnavailableError(
+                        "Explanations require a tree-based model; the loaded model is "
+                        f"{type(clf).__name__}."
+                    ) from exc
 
             scaler = getattr(self._model, "named_steps", {}).get("scaler")
             scaled_features = scaler.transform(feature_matrix) if scaler else feature_matrix
 
-            shap_values = self._explainer.shap_values(scaled_features)
+            try:
+                shap_values = self._explainer.shap_values(scaled_features)
+            except Exception as exc:
+                logger.warning("SHAP computation failed: %s", exc)
+                raise StressExplanationUnavailableError(
+                    "Failed to compute SHAP explanation."
+                ) from exc
             return shap_values, self._explainer.expected_value
-
-    def _build_shap_background(self) -> np.ndarray:
-        artifacts = self._artifacts or {}
-        background = self._artifact_background(artifacts)
-        if background is not None:
-            return background
-
-        scaler = getattr(self._model, "named_steps", {}).get("scaler")
-        scaler_means = getattr(scaler, "mean_", None)
-        if (
-            scaler_means is not None
-            and len(scaler_means) == len(self._feature_columns)
-        ):
-            return np.asarray(scaler_means, dtype=float).reshape(1, -1)
-
-        demo_defaults = artifacts.get("demo_defaults", {})
-        baseline = [
-            float(demo_defaults.get(column, 0.0))
-            for column in self._feature_columns
-        ]
-        return np.asarray([baseline], dtype=float)
-
-    def _artifact_background(self, artifacts: dict[str, Any]) -> Optional[np.ndarray]:
-        for key in ("shap_background", "background_data", "X_background"):
-            if key in artifacts:
-                return self._normalize_background(artifacts[key])
-
-        training_feature_means = artifacts.get("training_feature_means")
-        if isinstance(training_feature_means, dict):
-            return np.asarray(
-                [
-                    [
-                        float(training_feature_means.get(column, 0.0))
-                        for column in self._feature_columns
-                    ]
-                ],
-                dtype=float,
-            )
-
-        return None
-
-    def _normalize_background(self, background: Any) -> np.ndarray:
-        if hasattr(background, "to_numpy"):
-            background = background.to_numpy()
-        background_array = np.asarray(background, dtype=float)
-        if background_array.ndim == 1:
-            background_array = background_array.reshape(1, -1)
-        if background_array.shape[1] != len(self._feature_columns):
-            raise StressExplanationUnavailableError(
-                "SHAP background feature count does not match the model feature count."
-            )
-        max_rows = self._read_positive_int("SHAP_BACKGROUND_MAX_ROWS", 50)
-        return background_array[:max_rows]
 
     def _positive_class_shap_values(self, shap_values: Any) -> np.ndarray:
         feature_count = len(self._feature_columns)
@@ -364,11 +318,3 @@ class StressModelService:
         if value < -1e-9:
             return "decreases_stress"
         return "neutral"
-
-    @staticmethod
-    def _read_positive_int(name: str, default: int) -> int:
-        try:
-            value = int(os.getenv(name, str(default)))
-        except ValueError:
-            return default
-        return value if value > 0 else default

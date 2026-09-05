@@ -1,3 +1,9 @@
+# Runtime dependencies. Compile with Python 3.12 to match the deploy target
+# (see .github/workflows) — compiling on an older Python pulls in backports that
+# cannot install on the runner.
+#
+# Test and tooling dependencies live in requirements-dev.in and are not deployed.
+
 # Core API
 fastapi
 uvicorn[standard]
@@ -15,22 +21,19 @@ bcrypt
 python-jose[cryptography]
 
 # Machine Learning Integration
+# scikit-learn is pinned to the version that trains the model in the
+# HeartRateMonitor ML repo. Unpickling across versions warns and can silently
+# change predictions, so the two must be bumped together.
+scikit-learn==1.9.0
 joblib
 numpy
-scikit-learn
 shap
 
-# Vector DB / LLM (from current requirements)
+# Vector DB / LLM
 qdrant-client
 sentence-transformers
 openai
 
-# Utils / Tooling
+# Utils
 python-dotenv
 structlog
-pip-tools
-
-# Testing
-pytest
-pytest-asyncio
-httpx

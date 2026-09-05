@@ -106,7 +106,10 @@ class StressService:
         from utils.openai import call_openai_for_stress
         try:
             llm_resp = call_openai_for_stress(features)
-        except Exception as e:
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="LLM stress prediction failed")
-        
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="LLM stress prediction failed",
+            ) from exc
+
         return llm_resp

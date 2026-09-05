@@ -1,0 +1,8 @@
+# Development and test dependencies. Not installed on the server.
+-c requirements.txt
+
+pytest
+pytest-asyncio
+httpx
+pip-tools
+pyflakes

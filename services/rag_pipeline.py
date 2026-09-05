@@ -1,10 +1,9 @@
-import hashlib
 import json
 import os
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 from sklearn.feature_extraction.text import HashingVectorizer

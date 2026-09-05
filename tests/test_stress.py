@@ -32,3 +32,28 @@ def test_stress_prediction_authorized(client, auth_token):
     if response.status_code == 200:
         data = response.json()
         assert "stress_level_pct" in data
+
+def test_explanation_unavailable_returns_503(client, auth_token, monkeypatch):
+    """A model SHAP cannot explain must degrade to 503, not crash with a 500."""
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    from services.stress_service import stress_model
+
+    columns = stress_model.feature_columns
+    features = [[valid_stress_payload.get(column, 0.0) for column in columns]]
+    # Any non-tree model: TreeExplainer cannot explain it, but predict still works.
+    linear = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression())])
+    linear.fit(features * 2, [0, 1])
+
+    monkeypatch.setattr(stress_model, "_model", linear)
+    monkeypatch.setattr(stress_model, "_explainer", None)
+
+    response = client.post(
+        "/stress-predict/explain",
+        headers={"Authorization": f"Bearer {auth_token}"},
+        json=valid_stress_payload,
+    )
+    assert response.status_code == 503
+    assert "LogisticRegression" in response.json()["detail"]
