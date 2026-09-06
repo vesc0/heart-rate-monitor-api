@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 # ── Validators ────────────────────────────────────────
@@ -62,8 +62,7 @@ class UserProfile(BaseModel):
     weight_kg: Optional[int] = None
     health_issues: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserProfileUpdate(BaseModel):
@@ -93,8 +92,7 @@ class HeartRateResponse(BaseModel):
     stress_level: Optional[str] = None
     activity_state: Optional[ActivityState] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class HeartRateBulkDelete(BaseModel):

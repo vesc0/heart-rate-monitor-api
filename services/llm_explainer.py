@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from dataclasses import asdict, is_dataclass
 from typing import Any
 
@@ -72,10 +73,11 @@ class StressExplanationLLM:
                     },
                 ],
                 temperature=0.2,
-                max_tokens=550,
+                # Reasoning models spend part of this budget before emitting content.
+                max_tokens=1200,
                 timeout=self.timeout,
             )
-            explanation = (response.choices[0].message.content or "").strip()
+            explanation = self._normalize(response.choices[0].message.content or "")
         except Exception as exc:
             raise LLMExplanationUnavailableError(
                 f"OpenAI explanation request failed: {exc}"
@@ -87,6 +89,14 @@ class StressExplanationLLM:
             )
 
         return explanation
+
+    # Models emit typographic spaces and hyphens that render poorly on iOS.
+    _SUBSTITUTIONS = str.maketrans({"\u202f": " ", "\u00a0": " ", "\u2009": " ", "\u2011": "-"})
+
+    @classmethod
+    def _normalize(cls, text: str) -> str:
+        lines = [line.rstrip() for line in text.translate(cls._SUBSTITUTIONS).splitlines()]
+        return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
     @staticmethod
     def _system_prompt() -> str:
@@ -100,10 +110,12 @@ class StressExplanationLLM:
             "inside it. Do not diagnose disease, do not claim certainty, and do "
             "not provide emergency guidance beyond recommending professional care "
             "when symptoms or concerns are present.\n\n"
-            "Write a concise natural-language explanation for a mobile app user. "
-            "Explain the main model drivers, connect them cautiously to HRV and "
-            "autonomic balance, mention that camera PPG and HRV are indirect "
-            "signals, and keep the tone practical. Do not output JSON."
+            "Write for one user reading on a phone screen.\n"
+            "- Plain prose only: no Markdown, tables, lists, or headings.\n"
+            "- Exactly three short paragraphs separated by a blank line: the result, "
+            "the two or three metrics that drove it, then one practical takeaway "
+            "noting that camera PPG is an indirect signal and this is not a diagnosis.\n"
+            "- Under 130 words. Finish every sentence."
         )
 
     @staticmethod

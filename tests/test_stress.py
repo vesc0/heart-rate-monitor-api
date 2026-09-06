@@ -57,3 +57,13 @@ def test_explanation_unavailable_returns_503(client, auth_token, monkeypatch):
     )
     assert response.status_code == 503
     assert "LogisticRegression" in response.json()["detail"]
+
+
+def test_explanation_normalized_for_display():
+    """Typographic spaces and hyphens from the LLM must not reach the app."""
+    from services.llm_explainer import StressExplanationLLM
+
+    raw = "First\u202fline.  \n\n\n\nSecond\u00a0camera\u2011based line.  "
+    assert StressExplanationLLM._normalize(raw) == (
+        "First line.\n\nSecond camera-based line."
+    )
