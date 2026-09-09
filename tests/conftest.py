@@ -33,7 +33,9 @@ def setup_db():
 def db_session():
     connection = engine.connect()
     transaction = connection.begin()
-    session = TestingSessionLocal(bind=connection)
+    # Savepoints let a service roll back its own failed statement (the upsert path)
+    # without discarding the transaction that isolates the test.
+    session = TestingSessionLocal(bind=connection, join_transaction_mode="create_savepoint")
     yield session
     session.close()
     transaction.rollback()

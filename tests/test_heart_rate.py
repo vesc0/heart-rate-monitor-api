@@ -46,3 +46,26 @@ def test_get_heart_rate_records(client, auth_token):
     data = response.json()
     assert len(data) >= 1
     assert data[0]["bpm"] in [85, 70]
+
+def test_stress_explanation_round_trips(client, auth_token):
+    """The app stores the LLM explanation server-side, so a refresh must return it."""
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    entry = {
+        "id": "3f6c1b3e-6f4e-4a7c-9f2a-2b8d4e5a1c90",
+        "bpm": 78,
+        "recorded_at": "2023-10-27T10:10:00Z",
+        "stress_level": "42%",
+        "stress_explanation": "Your heart rate stayed steady and variability was healthy.",
+    }
+    assert client.post("/heart-rate", headers=headers, json=entry).status_code == 201
+
+    listed = client.get("/heart-rate", headers=headers).json()
+    stored = next(item for item in listed if item["id"] == entry["id"])
+    assert stored["stress_explanation"] == entry["stress_explanation"]
+
+    # Re-posting the same id upserts rather than duplicating.
+    entry["stress_explanation"] = "Updated explanation."
+    assert client.post("/heart-rate", headers=headers, json=entry).status_code == 201
+    listed = client.get("/heart-rate", headers=headers).json()
+    matches = [item for item in listed if item["id"] == entry["id"]]
+    assert len(matches) == 1 and matches[0]["stress_explanation"] == "Updated explanation."

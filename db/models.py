@@ -33,6 +33,7 @@ class HeartRateRecord(Base):
     recorded_at = Column(DateTime(timezone=True), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
     stress_level = Column(String, nullable=True)
+    stress_explanation = Column(String, nullable=True)
     activity_state = Column(String, nullable=True)
 
     user = relationship("User", back_populates="heart_rate_records")

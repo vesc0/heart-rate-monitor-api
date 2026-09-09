@@ -22,6 +22,7 @@ class HeartRateService:
             bpm=entry.bpm,
             recorded_at=rec_dt,
             stress_level=entry.stress_level,
+            stress_explanation=entry.stress_explanation,
             activity_state=entry.activity_state,
         )
         db.add(record)
@@ -39,6 +40,7 @@ class HeartRateService:
                 existing.bpm = entry.bpm
                 existing.recorded_at = rec_dt
                 existing.stress_level = entry.stress_level
+                existing.stress_explanation = entry.stress_explanation
                 existing.activity_state = entry.activity_state
                 db.commit()
                 db.refresh(existing)

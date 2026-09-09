@@ -81,6 +81,7 @@ class HeartRateCreate(BaseModel):
     bpm: int = Field(..., ge=30, le=250)
     recorded_at: datetime
     stress_level: Optional[str] = None
+    stress_explanation: Optional[str] = Field(None, max_length=4000)
     activity_state: Optional[ActivityState] = None
 
 
@@ -90,6 +91,7 @@ class HeartRateResponse(BaseModel):
     recorded_at: datetime
     created_at: datetime
     stress_level: Optional[str] = None
+    stress_explanation: Optional[str] = None
     activity_state: Optional[ActivityState] = None
 
     model_config = ConfigDict(from_attributes=True)
