@@ -102,9 +102,8 @@ class HeartRateBulkDelete(BaseModel):
 
 
 # ── Stress prediction ────────────────────────────────
-# HRV features computed from a 60-second PPG capture window, plus optional demographics for improved prediction.
+# HRV features computed from a 60-second PPG capture window.
 class StressPredictRequest(BaseModel):
-    # HRV features (required)
     sdnn: float = Field(..., description="Std dev of RR intervals (ms)")
     median_rr: float = Field(..., description="Median RR interval (ms)")
     cv_rr: float = Field(..., description="Coefficient of variation of RR")
@@ -126,11 +125,6 @@ class StressPredictRequest(BaseModel):
     sd1: float = Field(0, description="Poincaré SD1")
     sd2: float = Field(0, description="Poincaré SD2")
     sd_ratio: float = Field(0, description="SD2/SD1 ratio")
-    # Demographics (optional — medians used when missing)
-    age: Optional[float] = Field(None, description="Age in years")
-    gender_male: Optional[float] = Field(None, description="1=male, 0=female")
-    height_cm: Optional[float] = Field(None, description="Height in cm")
-    weight_kg: Optional[float] = Field(None, description="Weight in kg")
 
 
 class StressPredictResponse(BaseModel):

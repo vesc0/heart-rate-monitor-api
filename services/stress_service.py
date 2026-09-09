@@ -1,9 +1,7 @@
 import os
 from pathlib import Path
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
 
-from db.models import User
 from schemas.schemas import StressPredictRequest
 from services.stress_model import StressModelService, StressModelUnavailableError, StressExplanationUnavailableError
 from services.rag_pipeline import LocalHrvRagPipeline, RagPipelineUnavailableError
@@ -31,10 +29,9 @@ stress_analysis = StressAnalysisService(
 
 class StressService:
     @staticmethod
-    def predict_stress(user_id: int, body: StressPredictRequest, db: Session):
-        user = db.query(User).filter(User.id == user_id).first()
+    def predict_stress(body: StressPredictRequest):
         try:
-            prediction = stress_model.predict(body, user)
+            prediction = stress_model.predict(body)
         except StressModelUnavailableError:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -43,12 +40,10 @@ class StressService:
         return prediction
 
     @staticmethod
-    def explain_stress(user_id: int, body: StressPredictRequest, top_n: int, db: Session):
-        user = db.query(User).filter(User.id == user_id).first()
+    def explain_stress(body: StressPredictRequest, top_n: int):
         try:
             prediction, explanation = stress_model.predict_with_explanation(
                 body,
-                user,
                 top_n=top_n,
             )
         except StressModelUnavailableError:
@@ -64,12 +59,10 @@ class StressService:
         return prediction, explanation
 
     @staticmethod
-    def analyze_stress(user_id: int, body: StressPredictRequest, top_features: int, top_k: int, db: Session):
-        user = db.query(User).filter(User.id == user_id).first()
+    def analyze_stress(body: StressPredictRequest, top_features: int, top_k: int):
         try:
             result = stress_analysis.analyze(
                 body,
-                user,
                 top_features=top_features,
                 top_k=top_k,
             )
@@ -96,9 +89,8 @@ class StressService:
         return result
 
     @staticmethod
-    def predict_stress_llm(user_id: int, body: StressPredictRequest, db: Session):
-        user = db.query(User).filter(User.id == user_id).first()
-        features = stress_model.build_features(body, user)
+    def predict_stress_llm(body: StressPredictRequest):
+        features = stress_model.build_features(body)
 
         if not os.getenv("OPENAI_API_KEY"):
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="OpenAI API key not configured")

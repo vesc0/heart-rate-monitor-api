@@ -29,13 +29,11 @@ class StressAnalysisService:
     def analyze(
         self,
         request: Any,
-        user: Any = None,
         top_features: int = 6,
         top_k: int = 4,
     ) -> StressAnalysisResult:
         prediction, shap_explanation = self._stress_model.predict_with_explanation(
             request,
-            user,
             top_n=top_features,
         )
         important_features = shap_explanation.top_contributions

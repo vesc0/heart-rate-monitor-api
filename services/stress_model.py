@@ -9,7 +9,6 @@ import numpy as np
 from core.logger import get_logger
 logger = get_logger(__name__)
 
-DEMOGRAPHIC_FEATURE_FIELDS = ("age", "gender_male", "height_cm", "weight_kg")
 HRV_FEATURE_FIELDS = (
     "sdnn",
     "median_rr",
@@ -31,13 +30,8 @@ HRV_FEATURE_FIELDS = (
     "sd2",
     "sd_ratio",
 )
-DEFAULT_FEATURE_COLUMNS = (*DEMOGRAPHIC_FEATURE_FIELDS, *HRV_FEATURE_FIELDS)
 
 FEATURE_DISPLAY_NAMES = {
-    "age": "Age",
-    "gender_male": "Male gender indicator",
-    "height_cm": "Height",
-    "weight_kg": "Weight",
     "sdnn": "SDNN",
     "median_rr": "Median RR interval",
     "cv_rr": "RR coefficient of variation",
@@ -100,7 +94,7 @@ class StressModelService:
         self.artifact_path = artifact_path
         self._artifacts: Optional[dict[str, Any]] = None
         self._model: Any = None
-        self._feature_columns = list(DEFAULT_FEATURE_COLUMNS)
+        self._feature_columns = list(HRV_FEATURE_FIELDS)
         self._explainer: Any = None
         self._shap_lock = threading.Lock()
         self.load()
@@ -127,49 +121,18 @@ class StressModelService:
                 exc,
             )
 
-    def build_features(self, request: Any, user: Any = None) -> dict[str, float]:
-        artifacts = self._artifacts or {}
-        demo_defaults = artifacts.get("demo_defaults", {})
-        features = {key: float(value) for key, value in demo_defaults.items()}
-
-        for field_name in HRV_FEATURE_FIELDS:
-            features[field_name] = self._to_float(getattr(request, field_name), field_name)
-
-        for field_name in DEMOGRAPHIC_FEATURE_FIELDS:
-            body_value = getattr(request, field_name)
-            if body_value is not None:
-                features[field_name] = self._to_float(body_value, field_name)
-
-        if user is not None:
-            if (
-                getattr(request, "age") is None
-                and getattr(user, "age", None) is not None
-            ):
-                features["age"] = float(user.age)
-            if (
-                getattr(request, "gender_male") is None
-                and getattr(user, "gender", None) is not None
-            ):
-                features["gender_male"] = 1.0 if user.gender == "male" else 0.0
-            if (
-                getattr(request, "height_cm") is None
-                and getattr(user, "height_cm", None) is not None
-            ):
-                features["height_cm"] = float(user.height_cm)
-            if (
-                getattr(request, "weight_kg") is None
-                and getattr(user, "weight_kg", None) is not None
-            ):
-                features["weight_kg"] = float(user.weight_kg)
-
-        for field_name in self._feature_columns:
-            features.setdefault(field_name, 0.0)
-
+    def build_features(self, request: Any) -> dict[str, float]:
+        features = {
+            name: self._to_float(getattr(request, name), name)
+            for name in HRV_FEATURE_FIELDS
+        }
+        for column in self._feature_columns:
+            features.setdefault(column, 0.0)
         return features
 
-    def predict(self, request: Any, user: Any = None) -> StressPrediction:
+    def predict(self, request: Any) -> StressPrediction:
         self._require_model()
-        features = self.build_features(request, user)
+        features = self.build_features(request)
         stress_probability = self._predict_stress_probability(features)
         stress_pct = round(stress_probability * 100, 1)
         return StressPrediction(
@@ -181,10 +144,9 @@ class StressModelService:
     def predict_with_explanation(
         self,
         request: Any,
-        user: Any = None,
         top_n: int = 8,
     ) -> tuple[StressPrediction, ShapExplanation]:
-        prediction = self.predict(request, user)
+        prediction = self.predict(request)
         explanation = self.explain(prediction.feature_values, top_n=top_n)
         return prediction, explanation
 
