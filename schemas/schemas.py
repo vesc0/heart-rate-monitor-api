@@ -80,7 +80,7 @@ class HeartRateCreate(BaseModel):
     id: Optional[str] = None  # client-generated UUID (optional)
     bpm: int = Field(..., ge=30, le=250)
     recorded_at: datetime
-    stress_level: Optional[str] = None
+    stress_level: Optional[int] = Field(None, ge=0, le=100)
     stress_explanation: Optional[str] = Field(None, max_length=4000)
     activity_state: Optional[ActivityState] = None
 
@@ -90,7 +90,7 @@ class HeartRateResponse(BaseModel):
     bpm: int
     recorded_at: datetime
     created_at: datetime
-    stress_level: Optional[str] = None
+    stress_level: Optional[int] = None
     stress_explanation: Optional[str] = None
     activity_state: Optional[ActivityState] = None
 
