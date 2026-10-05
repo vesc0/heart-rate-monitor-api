@@ -24,6 +24,8 @@ def run_migrations() -> None:
     migrations to run normally.
     """
     config = Config(_CONFIG_PATH)
+    # The app has already set up logging; env.py must not replace it.
+    config.attributes["configure_logger"] = False
     with engine.begin() as lock:
         # Workers starting together take turns instead of racing the upgrade.
         if engine.dialect.name == "postgresql":
