@@ -5,7 +5,7 @@ from pathlib import Path
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from core.logger import get_logger
 from db.database import engine
@@ -24,10 +24,14 @@ def run_migrations() -> None:
     migrations to run normally.
     """
     config = Config(_CONFIG_PATH)
-    tables = inspect(engine).get_table_names()
+    with engine.begin() as lock:
+        # Workers starting together take turns instead of racing the upgrade.
+        if engine.dialect.name == "postgresql":
+            lock.execute(text("SELECT pg_advisory_xact_lock(7203119)"))
+        tables = inspect(engine).get_table_names()
 
-    if "alembic_version" not in tables and "users" in tables:
-        logger.info("Adopting pre-Alembic database at the initial revision")
-        command.stamp(config, ScriptDirectory.from_config(config).get_base())
+        if "alembic_version" not in tables and "users" in tables:
+            logger.info("Adopting pre-Alembic database at the initial revision")
+            command.stamp(config, ScriptDirectory.from_config(config).get_base())
 
-    command.upgrade(config, "head")
+        command.upgrade(config, "head")

@@ -27,7 +27,7 @@ This is not a medical app. The stress analysis and HRV insights are intended for
 - **Docker**: Included `Dockerfile` for easy containerized deployment.
 
 ## Project Architecture
-**`main.py`**: FastAPI application setup, global exception handlers, routing, middleware (CORS), database initialization, and startup logic.
+**`main.py`**: FastAPI application setup, global exception handlers, routing, database migrations, and startup logic.
 
 **API Layer (api/)**: Responsible for HTTP endpoints and request handling.
 - `api/routes/auth.py`: Registration, login, and logout endpoints.
@@ -56,9 +56,7 @@ This is not a medical app. The stress analysis and HRV insights are intended for
 **Core Layer (core/)**: Application-wide configuration and security utilities.
 - `config.py`: Environment configuration and settings management.
 - `security.py`: Password hashing and JWT token utilities.
-
-**Utility Layer (utils/)**:
-- `openai.py`: OpenAI client initialization and helper methods.
+- `limiter.py`: Per-client rate limiting for login, registration, and stress analysis.
 
 **Knowledge Base (knowledge_base/)**: Contains local HRV medical knowledge used by RAG.
 - `hrv_medical_knowledge.json`: Curated HRV and stress-related medical information.

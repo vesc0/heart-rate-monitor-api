@@ -104,27 +104,29 @@ class HeartRateBulkDelete(BaseModel):
 # ── Stress prediction ────────────────────────────────
 # HRV features computed from a 60-second PPG capture window.
 class StressPredictRequest(BaseModel):
-    sdnn: float = Field(..., description="Std dev of RR intervals (ms)")
-    median_rr: float = Field(..., description="Median RR interval (ms)")
-    cv_rr: float = Field(..., description="Coefficient of variation of RR")
-    rmssd: float = Field(..., description="Root mean square of successive differences (ms)")
-    pnn50: float = Field(..., description="% of successive diffs > 50ms")
-    pnn20: float = Field(..., description="% of successive diffs > 20ms")
-    mean_hr: float = Field(..., description="Mean heart rate (BPM)")
-    std_hr: float = Field(..., description="Std dev of heart rate (BPM)")
-    min_hr: float = Field(..., description="Minimum heart rate (BPM)")
-    max_hr: float = Field(..., description="Maximum heart rate (BPM)")
-    hr_range: float = Field(..., description="Heart rate range (BPM)")
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    sdnn: float = Field(..., ge=0, le=2000, description="Std dev of RR intervals (ms)")
+    median_rr: float = Field(..., ge=240, le=2000, description="Median RR interval (ms)")
+    cv_rr: float = Field(..., ge=0, le=5, description="Coefficient of variation of RR")
+    rmssd: float = Field(..., ge=0, le=2000, description="Root mean square of successive differences (ms)")
+    pnn50: float = Field(..., ge=0, le=100, description="% of successive diffs > 50ms")
+    pnn20: float = Field(..., ge=0, le=100, description="% of successive diffs > 20ms")
+    mean_hr: float = Field(..., ge=30, le=250, description="Mean heart rate (BPM)")
+    std_hr: float = Field(..., ge=0, le=250, description="Std dev of heart rate (BPM)")
+    min_hr: float = Field(..., ge=30, le=250, description="Minimum heart rate (BPM)")
+    max_hr: float = Field(..., ge=30, le=250, description="Maximum heart rate (BPM)")
+    hr_range: float = Field(..., ge=0, le=250, description="Heart rate range (BPM)")
     # Frequency-domain HRV
-    lf_power: float = Field(0, description="Low-frequency power")
-    hf_power: float = Field(0, description="High-frequency power")
-    lf_hf_ratio: float = Field(0, description="LF/HF ratio")
-    total_power: float = Field(0, description="Total spectral power")
-    lf_norm: float = Field(0, description="Normalized LF power (%)")
+    lf_power: float = Field(0, ge=0, le=1e9, description="Low-frequency power")
+    hf_power: float = Field(0, ge=0, le=1e9, description="High-frequency power")
+    lf_hf_ratio: float = Field(0, ge=0, le=1e9, description="LF/HF ratio")
+    total_power: float = Field(0, ge=0, le=1e9, description="Total spectral power")
+    lf_norm: float = Field(0, ge=0, le=100, description="Normalized LF power (%)")
     # Nonlinear HRV
-    sd1: float = Field(0, description="Poincaré SD1")
-    sd2: float = Field(0, description="Poincaré SD2")
-    sd_ratio: float = Field(0, description="SD2/SD1 ratio")
+    sd1: float = Field(0, ge=0, le=2000, description="Poincaré SD1")
+    sd2: float = Field(0, ge=0, le=2000, description="Poincaré SD2")
+    sd_ratio: float = Field(0, ge=0, le=1e9, description="SD2/SD1 ratio")
 
 
 class StressPredictResponse(BaseModel):
@@ -168,4 +170,4 @@ class RetrievedContextItem(BaseModel):
 class StressAnalysisResponse(StressPredictResponse):
     important_features: list[ShapFeatureContribution]
     retrieved_context: list[RetrievedContextItem]
-    explanation: str
+    explanation: Optional[str] = None

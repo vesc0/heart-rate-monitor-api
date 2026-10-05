@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -82,15 +83,20 @@ class LocalHrvRagPipeline:
     def __init__(
         self,
         knowledge_path: Path,
-        persist_dir: Path,
         collection_name: str = "hrv_medical_knowledge",
     ):
         self.knowledge_path = knowledge_path
-        self.persist_dir = persist_dir
         self.collection_name = collection_name
         self._client: Any = None
         self._embedding_provider: Any = None
         self._documents: list[KnowledgeDocument] = []
+        self._init_lock = threading.Lock()
+
+    def warm_up(self) -> None:
+        try:
+            self._ensure_initialized()
+        except Exception as exc:
+            logger.warning("RAG warm-up failed: %s", exc)
 
     def retrieve(self, query: str, top_k: int = 4) -> list[RetrievedContext]:
         self._ensure_initialized()
@@ -115,21 +121,22 @@ class LocalHrvRagPipeline:
         return contexts
 
     def _ensure_initialized(self) -> None:
-        if self._client is not None:
-            return
+        with self._init_lock:
+            if self._client is not None:
+                return
 
-        try:
-            from qdrant_client import QdrantClient
-        except Exception as exc:
-            raise RagPipelineUnavailableError(
-                "qdrant-client is not installed. Install backend dependencies first."
-            ) from exc
+            try:
+                from qdrant_client import QdrantClient
+            except Exception as exc:
+                raise RagPipelineUnavailableError(
+                    "qdrant-client is not installed. Install backend dependencies first."
+                ) from exc
 
-        self.persist_dir.mkdir(parents=True, exist_ok=True)
-        self._documents = self._load_documents()
-        self._embedding_provider = self._create_embedding_provider()
-        self._client = QdrantClient(path=str(self.persist_dir))
-        self._sync_collection()
+            self._documents = self._load_documents()
+            self._embedding_provider = self._create_embedding_provider()
+            # In memory: an on-disk index can only be opened by one worker process.
+            self._client = QdrantClient(":memory:")
+            self._sync_collection()
 
     def _load_documents(self) -> list[KnowledgeDocument]:
         try:

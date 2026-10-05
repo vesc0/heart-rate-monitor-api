@@ -1,9 +1,12 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
+from core.logger import get_logger
 from services.llm_explainer import StressExplanationLLM
 from services.rag_pipeline import LocalHrvRagPipeline, RetrievedContext
 from services.stress_model import ShapFeatureContribution, StressModelService
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -12,7 +15,7 @@ class StressAnalysisResult:
     is_stressed: bool
     important_features: list[ShapFeatureContribution]
     retrieved_context: list[RetrievedContext]
-    explanation: str
+    explanation: Optional[str]
 
 
 class StressAnalysisService:
@@ -43,14 +46,19 @@ class StressAnalysisService:
             prediction.is_stressed,
             important_features,
         )
-        retrieved_context = self._rag_pipeline.retrieve(retrieval_query, top_k=top_k)
-        explanation = self._explanation_llm.generate(
-            feature_values=prediction.feature_values,
-            stress_level_pct=prediction.stress_level_pct,
-            is_stressed=prediction.is_stressed,
-            important_features=important_features,
-            retrieved_context=retrieved_context,
-        )
+        # The prediction stands on its own; the written explanation is best effort.
+        try:
+            retrieved_context = self._rag_pipeline.retrieve(retrieval_query, top_k=top_k)
+            explanation = self._explanation_llm.generate(
+                feature_values=prediction.feature_values,
+                stress_level_pct=prediction.stress_level_pct,
+                is_stressed=prediction.is_stressed,
+                important_features=important_features,
+                retrieved_context=retrieved_context,
+            )
+        except Exception as exc:
+            logger.warning("Stress explanation unavailable: %s", exc)
+            retrieved_context, explanation = [], None
 
         return StressAnalysisResult(
             stress_level_pct=prediction.stress_level_pct,

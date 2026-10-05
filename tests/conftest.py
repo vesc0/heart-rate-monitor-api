@@ -6,12 +6,21 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# Must precede the main import: the app runs migrations at startup.
-os.environ["RUN_MIGRATIONS"] = "0"
+# Must precede the main import: settings are read once, and tests must never
+# reach a real database or download an embedding model.
+os.environ.update(
+    RUN_MIGRATIONS="0",
+    DATABASE_URL="sqlite://",
+    SECRET_KEY="test-secret",
+    RAG_EMBEDDING_BACKEND="hashing",
+)
 
 from main import app
+from core.limiter import limiter
 from db.database import Base
 from api.dependencies import get_db
+
+limiter.enabled = False
 
 # Create an in-memory SQLite database for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"

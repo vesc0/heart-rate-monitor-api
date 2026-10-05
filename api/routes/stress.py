@@ -1,7 +1,8 @@
 from dataclasses import asdict
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 
 from api.dependencies import get_current_user_id
+from core.limiter import limiter
 from schemas.schemas import StressPredictRequest, StressPredictResponse, StressExplainResponse, StressAnalysisResponse
 from services.stress_service import StressService
 
@@ -13,13 +14,6 @@ def predict_stress(
     _: int = Depends(get_current_user_id),
 ):
     return StressService.predict_stress(body)
-
-@router.post("/stress-predict-llm", response_model=StressPredictResponse, deprecated=True)
-def predict_stress_llm(
-    body: StressPredictRequest,
-    _: int = Depends(get_current_user_id),
-):
-    return StressService.predict_stress_llm(body)
 
 @router.post("/stress-predict/explain", response_model=StressExplainResponse)
 def explain_stress_prediction(
@@ -35,7 +29,9 @@ def explain_stress_prediction(
     )
 
 @router.post("/stress-analysis", response_model=StressAnalysisResponse)
+@limiter.limit("10/minute;100/day")
 def analyze_stress(
+    request: Request,
     body: StressPredictRequest,
     _: int = Depends(get_current_user_id),
     top_features: int = Query(6, ge=1, le=20),

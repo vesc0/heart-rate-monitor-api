@@ -4,21 +4,19 @@ from fastapi import HTTPException, status
 
 from schemas.schemas import StressPredictRequest
 from services.stress_model import StressModelService, StressModelUnavailableError, StressExplanationUnavailableError
-from services.rag_pipeline import LocalHrvRagPipeline, RagPipelineUnavailableError
-from services.llm_explainer import StressExplanationLLM, LLMExplanationUnavailableError
+from services.rag_pipeline import LocalHrvRagPipeline
+from services.llm_explainer import StressExplanationLLM
 from services.stress_analysis import StressAnalysisService
 
 # Constants for paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 _ML_ARTIFACT_PATH = BASE_DIR / "ml_models" / "all_artifacts.joblib"
 _KNOWLEDGE_PATH = Path(os.getenv("HRV_KNOWLEDGE_PATH", str(BASE_DIR / "knowledge_base" / "hrv_medical_knowledge.json")))
-_VECTOR_DB_DIR = Path(os.getenv("VECTOR_DB_DIR", str(BASE_DIR / "vector_store")))
 
 # Instances
 stress_model = StressModelService(_ML_ARTIFACT_PATH)
 rag_pipeline = LocalHrvRagPipeline(
     knowledge_path=_KNOWLEDGE_PATH,
-    persist_dir=_VECTOR_DB_DIR,
     collection_name=os.getenv("RAG_COLLECTION_NAME", "hrv_medical_knowledge"),
 )
 stress_analysis = StressAnalysisService(
@@ -76,32 +74,4 @@ class StressService:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=str(exc),
             )
-        except RagPipelineUnavailableError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=str(exc),
-            )
-        except LLMExplanationUnavailableError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=str(exc),
-            )
         return result
-
-    @staticmethod
-    def predict_stress_llm(body: StressPredictRequest):
-        features = stress_model.build_features(body)
-
-        if not os.getenv("OPENAI_API_KEY"):
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="OpenAI API key not configured")
-
-        from utils.openai import call_openai_for_stress
-        try:
-            llm_resp = call_openai_for_stress(features)
-        except Exception as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="LLM stress prediction failed",
-            ) from exc
-
-        return llm_resp

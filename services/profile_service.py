@@ -15,6 +15,13 @@ class ProfileService:
         return user
 
     @staticmethod
+    def delete_account(user_id: int, db: Session):
+        user = db.get(User, user_id)
+        if user:
+            db.delete(user)
+            db.commit()
+
+    @staticmethod
     def update_profile(user_id: int, body: UserProfileUpdate, db: Session):
         user = db.query(User).filter(User.id == user_id).first()
         if not user:

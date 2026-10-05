@@ -1,0 +1,7 @@
+.env
+.git
+venv/
+vector_store/
+tests/
+__pycache__/
+.pytest_cache/

@@ -39,7 +39,8 @@ class StressExplanationLLM:
                 "OPENAI_API_KEY is not configured."
             )
 
-        client_kwargs = {"api_key": api_key}
+        # No retries: the app waits on this call, so the timeout is the whole budget.
+        client_kwargs = {"api_key": api_key, "max_retries": 0}
         base_url = os.getenv("OPENAI_BASE_URL")
         if base_url:
             client_kwargs["base_url"] = base_url

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db, get_current_user_id
@@ -21,3 +21,10 @@ def update_profile(
     db: Session = Depends(get_db),
 ):
     return ProfileService.update_profile(user_id, body, db)
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    ProfileService.delete_account(user_id, db)

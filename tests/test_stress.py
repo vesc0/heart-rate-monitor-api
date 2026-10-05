@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 @pytest.fixture
@@ -28,10 +30,60 @@ def test_stress_prediction_authorized(client, auth_token):
         headers={"Authorization": f"Bearer {auth_token}"},
         json=valid_stress_payload
     )
-    assert response.status_code in [200, 503]
-    if response.status_code == 200:
-        data = response.json()
-        assert "stress_level_pct" in data
+    assert response.status_code == 200
+    assert 0 <= response.json()["stress_level_pct"] <= 100
+
+def test_artifact_matches_request_schema():
+    """A retrained model with different inputs must fail here, not in production."""
+    from schemas.schemas import StressPredictRequest
+    from services.stress_model import HRV_FEATURE_FIELDS
+    from services.stress_service import stress_model
+
+    assert stress_model.is_available
+    assert stress_model.feature_columns == list(HRV_FEATURE_FIELDS) == list(StressPredictRequest.model_fields)
+    assert list(stress_model._model.classes_) == [0, 1]
+
+@pytest.mark.parametrize("sdnn", [-1, 1e300, float("nan")])
+def test_out_of_range_features_rejected(client, auth_token, sdnn):
+    response = client.post(
+        "/stress-predict",
+        headers={"Authorization": f"Bearer {auth_token}", "Content-Type": "application/json"},
+        content=json.dumps({**valid_stress_payload, "sdnn": sdnn}),
+    )
+    assert response.status_code == 422
+
+def test_stress_analysis(client, auth_token, monkeypatch):
+    from services.llm_explainer import StressExplanationLLM
+
+    monkeypatch.setattr(StressExplanationLLM, "generate", lambda self, **kwargs: "Explained.")
+    response = client.post(
+        "/stress-analysis",
+        headers={"Authorization": f"Bearer {auth_token}"},
+        json=valid_stress_payload,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["explanation"] == "Explained."
+    assert len(data["important_features"]) == 6
+    assert len(data["retrieved_context"]) == 4
+
+def test_stress_analysis_survives_llm_failure(client, auth_token, monkeypatch):
+    from services.llm_explainer import LLMExplanationUnavailableError, StressExplanationLLM
+
+    def fail(self, **kwargs):
+        raise LLMExplanationUnavailableError("down")
+
+    monkeypatch.setattr(StressExplanationLLM, "generate", fail)
+    response = client.post(
+        "/stress-analysis",
+        headers={"Authorization": f"Bearer {auth_token}"},
+        json=valid_stress_payload,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["explanation"] is None
+    assert 0 <= data["stress_level_pct"] <= 100
+    assert len(data["important_features"]) == 6
 
 def test_explanation_unavailable_returns_503(client, auth_token, monkeypatch):
     """A model SHAP cannot explain must degrade to 503, not crash with a 500."""
