@@ -22,7 +22,7 @@ class AuthService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Email already registered",
             )
-        token = create_access_token(data={"sub": user.id})
+        token = create_access_token(user.id, user.token_version)
         return {
             "message": "User registered",
             "email": user.email,
@@ -39,7 +39,7 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid email or password",
             )
-        access_token = create_access_token(data={"sub": user.id})
+        access_token = create_access_token(user.id, user.token_version)
         return {
             "access_token": access_token,
             "token_type": "bearer",
@@ -51,3 +51,11 @@ class AuthService:
             "weight_kg": user.weight_kg,
             "health_issues": user.health_issues,
         }
+
+    @staticmethod
+    def logout(user_id: int, db: Session):
+        # Bumping the version invalidates every token issued to this account.
+        db.query(User).filter(User.id == user_id).update(
+            {User.token_version: User.token_version + 1}
+        )
+        db.commit()

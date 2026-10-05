@@ -15,6 +15,7 @@ class User(Base):
     name = Column(String, nullable=True)
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
     age = Column(Integer, nullable=True)
     gender = Column(String, nullable=True)
     height_cm = Column(Integer, nullable=True)
